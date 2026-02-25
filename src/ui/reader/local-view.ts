@@ -1,7 +1,7 @@
 import { FileView, WorkspaceLeaf, TFile, ItemView } from "obsidian";
 import { workerBridge } from "bridge";
 import { IframeReaderBridge } from "./bridge";
-import { LocalAnnotationManager } from "./local-anno-manager";
+import { LocalDataManager } from "./local-data-manager";
 
 import type {
     CreateReaderOptions,
@@ -18,7 +18,7 @@ export class LocalReaderView extends ItemView {
     private colorSchemeObserver?: MutationObserver;
     private colorScheme: ColorScheme = "light"; // Default to light
     private readerOptions: Partial<CreateReaderOptions> = {};
-    private annotationManager?: LocalAnnotationManager;
+    private dataManager?: LocalDataManager;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -46,6 +46,7 @@ export class LocalReaderView extends ItemView {
                 this.containerEl
                     .getElementsByClassName("view-header-title")[0]
                     ?.setText(this.file.name);
+
                 this.loadDocument(this.file);
             }
         }
@@ -90,14 +91,14 @@ export class LocalReaderView extends ItemView {
         try {
             // Create bridge once
             if (!this.bridge) {
-                // Initialize annotation manager
-                this.annotationManager = new LocalAnnotationManager(file);
+                // Initialize data manager
+                this.dataManager = new LocalDataManager(file);
                 this.bridge = new IframeReaderBridge(
                     container,
                     true,
                     undefined,
                     file,
-                    this.annotationManager,
+                    this.dataManager,
                 );
 
                 // Register event listeners
@@ -126,7 +127,7 @@ export class LocalReaderView extends ItemView {
                 });
 
                 this.bridge.onEventType("viewStateChanged", (evt) => {
-                    console.log("View state changed:", evt.primary, evt.state);
+                    this.handleViewStateChanged(evt.state, evt.primary);
                 });
 
                 this.bridge.onEventType("saveCustomThemes", (evt) => {
@@ -161,7 +162,7 @@ export class LocalReaderView extends ItemView {
                 this.bridge.connect(),
                 this.app.vault.readBinary(file),
                 (async () => {
-                    return await this.annotationManager?.load();
+                    return await this.dataManager?.loadAnnotations();
                 })(),
             ]);
 
@@ -169,6 +170,11 @@ export class LocalReaderView extends ItemView {
 
             // Initialize Reader if ready
             if (this.bridge.state === "bridge-ready") {
+                // Read persisted view state from data.json
+                const viewState = services.viewStateService.getViewState(
+                    file.path,
+                );
+
                 const opts = {
                     ...this.readerOptions,
                     colorScheme: this.colorScheme,
@@ -185,6 +191,8 @@ export class LocalReaderView extends ItemView {
                     },
                     type: type as any,
                     authorName: "",
+                    primaryViewState: viewState?.primaryViewState,
+                    secondaryViewState: viewState?.secondaryViewState,
                     ...opts,
                 });
             }
@@ -252,10 +260,22 @@ export class LocalReaderView extends ItemView {
     }
 
     /**
+     * Persist the reader's view state to data.json.
+     */
+    private handleViewStateChanged(state: unknown, primary: boolean) {
+        if (!this.file) return;
+        services.viewStateService.saveViewState(
+            this.file.path,
+            primary,
+            state as Record<string, unknown>,
+        );
+    }
+
+    /**
      * Handle saved/updated annotations
      */
     private async handleAnnotationsSaved(annotations: any[]) {
-        if (this.annotationManager) {
+        if (this.dataManager) {
             for (const annotation of annotations) {
                 const isVisual =
                     annotation.type === "image" || annotation.type === "ink";
@@ -270,7 +290,7 @@ export class LocalReaderView extends ItemView {
                             ),
                         );
                 }
-                await this.annotationManager.save(annotation);
+                await this.dataManager.saveAnnotation(annotation);
             }
         }
     }
@@ -280,9 +300,9 @@ export class LocalReaderView extends ItemView {
      * Optimization: Batch processing
      */
     private async handleAnnotationsDeleted(ids: string[]) {
-        if (this.annotationManager) {
+        if (this.dataManager) {
             for (const id of ids) {
-                const annotation = this.annotationManager.get(id);
+                const annotation = this.dataManager.getAnnotation(id);
                 if (annotation) {
                     const isVisual =
                         annotation.type === "image" ||
@@ -299,7 +319,7 @@ export class LocalReaderView extends ItemView {
                             );
                     }
                 }
-                await this.annotationManager.delete(id);
+                await this.dataManager.deleteAnnotation(id);
             }
         }
     }

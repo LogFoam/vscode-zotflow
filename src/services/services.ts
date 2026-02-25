@@ -1,33 +1,41 @@
-import { App } from "obsidian";
-
-import type { ZotFlowSettings } from "settings/types";
 import { IndexService } from "./index-service";
 import { LogService } from "./log-service";
 import { NotificationService } from "./notification-service";
+import { ViewStateService } from "./view-state-service";
 import { TaskMonitor } from "./task-monitor";
 import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
 
+import type { App, Plugin } from "obsidian";
+import type { ZotFlowSettings } from "settings/types";
+
 class ServiceLocator {
     private _app: App;
+    private _plugin: Plugin;
     private _settings: ZotFlowSettings;
     private _initialized = false;
 
     private _indexService: IndexService;
     private _logService: LogService;
     private _notificationService: NotificationService;
+    private _viewStateService: ViewStateService;
     private _taskMonitor: TaskMonitor;
 
-    initialize(app: App, settings: ZotFlowSettings) {
-        this._app = app;
+    initialize(plugin: Plugin, settings: ZotFlowSettings) {
+        this._plugin = plugin;
+        this._app = plugin.app;
         this._settings = settings;
 
         this._logService = new LogService();
         this._notificationService = new NotificationService();
-
-        this._indexService = new IndexService(app, this._logService);
+        this._viewStateService = new ViewStateService(
+            this._plugin,
+            this._logService,
+            () => this._settings,
+        );
+        this._indexService = new IndexService(this._app, this._logService);
         this._indexService.load();
 
-        this._taskMonitor = new TaskMonitor(app);
+        this._taskMonitor = new TaskMonitor(this._app);
 
         this._initialized = true;
         this._logService.info("Services initialized.", "LocalServiceLocator");
@@ -45,6 +53,11 @@ class ServiceLocator {
 
     updateSettings(newSettings: ZotFlowSettings) {
         this._settings = newSettings;
+    }
+
+    get plugin() {
+        this.assertInitialized();
+        return this._plugin;
     }
 
     get app() {
@@ -70,6 +83,11 @@ class ServiceLocator {
     get notificationService() {
         this.assertInitialized();
         return this._notificationService;
+    }
+
+    get viewStateService() {
+        this.assertInitialized();
+        return this._viewStateService;
     }
 
     get taskMonitor() {

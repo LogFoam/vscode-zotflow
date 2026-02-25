@@ -23,33 +23,4 @@ export class DbHelperService {
         if (!item || item.itemType !== "attachment") return undefined;
         return item as IDBZoteroItem<AttachmentData>;
     }
-
-    /**
-     * Persist the reader's scroll/position state for an attachment item.
-     * Called from the main thread whenever the reader emits `viewStateChanged`.
-     * Stored on the `items` record so it survives plugin reloads without any
-     * additional schema version bump (non-indexed optional field).
-     */
-    async saveViewState(
-        libraryID: number,
-        key: string,
-        primary: boolean,
-        state: Record<string, unknown>,
-    ): Promise<void> {
-        try {
-            await db.items.update(
-                [libraryID, key],
-                primary
-                    ? { primaryViewState: state }
-                    : { secondaryViewState: state },
-            );
-        } catch (e) {
-            this.parentHost.log(
-                "warn",
-                `Failed to persist ${primary ? "primaryViewState" : "secondaryViewState"} for item ${key}`,
-                "DbHelperService",
-                e,
-            );
-        }
-    }
 }

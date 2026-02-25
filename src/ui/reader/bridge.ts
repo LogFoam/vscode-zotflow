@@ -38,7 +38,7 @@ import { workerBridge } from "bridge";
 import type { ZotFlowSettings } from "settings/types";
 import type { IDBZoteroItem } from "types/db-schema";
 import type { AttachmentData } from "types/zotero-item";
-import type { LocalAnnotationManager } from "./local-anno-manager";
+import type { LocalDataManager } from "./local-data-manager";
 import { getLinkedSourceNote } from "utils/file";
 import type { TFile } from "obsidian";
 
@@ -81,7 +81,7 @@ export class IframeReaderBridge {
         private isLocal: boolean,
         private attachmentItem?: IDBZoteroItem<AttachmentData>,
         private localAttachment?: TFile,
-        private localAnnoManager?: LocalAnnotationManager,
+        private localDataManager?: LocalDataManager,
     ) {}
 
     /**
@@ -348,8 +348,8 @@ export class IframeReaderBridge {
                         this.attachmentItem,
                         services.settings.zoteroapikey,
                     );
-            } else if (this.isLocal && this.localAnnoManager) {
-                newAnnotationJson = this.localAnnoManager.getAll();
+            } else if (this.isLocal && this.localDataManager) {
+                newAnnotationJson = this.localDataManager.getAllAnnotations();
             }
 
             const newReaderOpts: CreateReaderOptions = {

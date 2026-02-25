@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import { workerBridge } from "bridge";
 import { IframeReaderBridge } from "./bridge";
 import { services } from "services/services";
+import { ViewStateService } from "services/view-state-service";
 
 import type { ViewStateResult } from "obsidian";
 import type { AttachmentData } from "types/zotero-item";
@@ -32,7 +33,6 @@ export class ZoteroReaderView extends ItemView {
     private colorScheme: ColorScheme = "light"; // Default to light
     private unsubscribeTaskMonitor?: () => void;
     private lastSyncTaskStatuses = new Map<string, ITaskInfo["status"]>();
-    private viewStateSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -273,6 +273,13 @@ export class ZoteroReaderView extends ItemView {
                         ? this.keyInfo.username || ""
                         : "";
 
+                const savedViewState = services.viewStateService.getViewState(
+                    ViewStateService.remoteKey(
+                        this.attachmentItem.libraryID,
+                        this.attachmentItem.key,
+                    ),
+                );
+
                 // Initialize Reader Logic
                 this.bridge.initReader({
                     data: {
@@ -281,7 +288,7 @@ export class ZoteroReaderView extends ItemView {
                     },
                     type: type,
                     authorName,
-                    primaryViewState: this.attachmentItem.primaryViewState,
+                    primaryViewState: savedViewState?.primaryViewState,
                     ...opts,
                 });
 
@@ -324,10 +331,6 @@ export class ZoteroReaderView extends ItemView {
 
     async onClose() {
         this.unsubscribeTaskMonitor?.();
-        if (this.viewStateSaveTimer !== null) {
-            clearTimeout(this.viewStateSaveTimer);
-            this.viewStateSaveTimer = null;
-        }
         if (this.colorSchemeObserver) {
             this.colorSchemeObserver.disconnect();
         }
@@ -337,34 +340,19 @@ export class ZoteroReaderView extends ItemView {
     }
 
     /**
-     * Debounce-persist the reader's view state to IDB.
-     * Called on every `viewStateChanged` event from the iframe.
-     * A 1 000 ms debounce prevents excessive IDB writes during scrolling.
+     * Persist the reader's view state to data.json.
      */
     private handleViewStateChanged(state: unknown, primary: boolean) {
         if (!this.attachmentItem) return;
 
-        if (this.viewStateSaveTimer !== null) {
-            clearTimeout(this.viewStateSaveTimer);
-        }
-
-        this.viewStateSaveTimer = setTimeout(() => {
-            this.viewStateSaveTimer = null;
-            workerBridge.dbHelper
-                .saveViewState(
-                    this.attachmentItem.libraryID,
-                    this.attachmentItem.key,
-                    primary,
-                    state as Record<string, unknown>,
-                )
-                .catch((e) => {
-                    services.logService.warn(
-                        "Failed to persist reader view state",
-                        "ZoteroReaderView",
-                        e,
-                    );
-                });
-        }, 1000);
+        services.viewStateService.saveViewState(
+            ViewStateService.remoteKey(
+                this.attachmentItem.libraryID,
+                this.attachmentItem.key,
+            ),
+            primary,
+            state as Record<string, unknown>,
+        );
     }
 
     /**

@@ -30,7 +30,12 @@ import { ZotFlowLockExtension } from "ui/zotflow-lock-extension";
 import { openAttachment } from "ui/viewer";
 import { ActivityCenterModal } from "ui/activity-center/modal";
 
-import type { ZotFlowSettings } from "./settings/types";
+import type {
+    ZotFlowSettings,
+    ZotFlowPluginData,
+    ViewStateEntry,
+} from "./settings/types";
+
 import {
     LOCAL_ZOTERO_READER_VIEW_TYPE,
     LocalReaderView,
@@ -41,13 +46,15 @@ const SUPPORTED_EXTENSIONS = ["pdf", "epub", "html"];
 
 export default class ZotFlow extends Plugin {
     settings: ZotFlowSettings;
+    viewStates: Record<string, ViewStateEntry>;
 
     async onload() {
         // Load settings
         await this.loadSettings();
 
         // Initialize local services
-        services.initialize(this.app, this.settings);
+        services.initialize(this, this.settings);
+        services.viewStateService.setViewStates(this.viewStates);
 
         // Initialize worker bridge
         try {
@@ -111,7 +118,7 @@ export default class ZotFlow extends Plugin {
             } catch {
                 const message = `Could not unregister extension: '${SUPPORTED_EXTENSIONS}'`;
                 services.logService.error(message, "Main");
-                services.notificationService.notify("error", message);
+                // services.notificationService.notify("error", message);
             }
         } else {
             for (const extension of SUPPORTED_EXTENSIONS) {
@@ -179,9 +186,24 @@ export default class ZotFlow extends Plugin {
         });
 
         this.addSettingTab(new ZotFlowSettingTab(this.app, this));
+
+        // Track file renames to keep viewStates keys in sync
+        this.registerEvent(
+            this.app.vault.on("rename", (file, oldPath) => {
+                services.viewStateService.renameViewState(oldPath, file.path);
+            }),
+        );
+
+        // Clean up view state when an attachment is deleted
+        this.registerEvent(
+            this.app.vault.on("delete", (file) => {
+                services.viewStateService.deleteViewState(file.path);
+            }),
+        );
     }
 
     onunload() {
+        services.viewStateService.flushViewStateSave();
         workerBridge.terminate();
         revokeBlobUrls();
     }
@@ -250,11 +272,19 @@ export default class ZotFlow extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign(
-            {},
-            DEFAULT_SETTINGS,
-            (await this.loadData()) as Partial<ZotFlowSettings>,
-        );
+        const raw = (await this.loadData()) as Record<string, unknown> | null;
+
+        if (raw && "settings" in raw) {
+            // New nested format: { settings, viewStates }
+            const data = raw as Partial<ZotFlowPluginData>;
+            this.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+            this.viewStates = { ...(data.viewStates ?? {}) };
+        } else {
+            // Legacy flat format
+            this.settings = { ...DEFAULT_SETTINGS, ...raw };
+            this.viewStates = {};
+        }
+
         // Load sensitive credentials from SecretStorage (cross-platform safe)
         loadCredentials(this.settings, this.app.secretStorage);
     }
@@ -262,8 +292,12 @@ export default class ZotFlow extends Plugin {
     async saveSettings() {
         // Store sensitive credentials in SecretStorage (cross-platform safe)
         saveCredentials(this.settings, this.app.secretStorage);
-        // Persist settings without sensitive fields to data.json
-        await this.saveData(stripCredentials(this.settings));
+        // Persist nested data.json (without sensitive fields)
+        const data: ZotFlowPluginData = {
+            settings: stripCredentials(this.settings),
+            viewStates: services.viewStateService.getViewStatesMap(),
+        };
+        await this.saveData(data);
         workerBridge.updateSettings(this.settings);
         services.updateSettings(this.settings);
     }
