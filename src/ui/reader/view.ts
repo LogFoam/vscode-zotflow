@@ -31,7 +31,6 @@ export class ZoteroReaderView extends ItemView {
     private keyInfo: IDBZoteroKey;
 
     private bridge?: IframeReaderBridge;
-    private colorSchemeObserver?: MutationObserver;
     private colorScheme: ColorScheme = "light"; // Default to light
     private unsubscribeTaskMonitor?: () => void;
     private lastSyncTaskStatuses = new Map<string, ITaskInfo["status"]>();
@@ -185,19 +184,20 @@ export class ZoteroReaderView extends ItemView {
                     console.log("Set dark theme:", evt.theme);
                 });
 
-                // Observe color scheme changes once and delegate to bridge
-                this.colorSchemeObserver = new MutationObserver(() => {
-                    const newColorScheme = getComputedStyle(document.body)
-                        .colorScheme as ColorScheme;
-                    if (newColorScheme && newColorScheme !== this.colorScheme) {
-                        this.bridge!.setColorScheme(newColorScheme);
-                        this.colorScheme = newColorScheme;
-                    }
-                });
-                this.colorSchemeObserver.observe(document.body, {
-                    attributes: true,
-                    attributeFilter: ["class"],
-                });
+                // Observe color scheme changes via Obsidian's css-change event
+                this.registerEvent(
+                    this.app.workspace.on("css-change", () => {
+                        const newColorScheme = getComputedStyle(document.body)
+                            .colorScheme as ColorScheme;
+                        if (
+                            newColorScheme &&
+                            newColorScheme !== this.colorScheme
+                        ) {
+                            this.bridge!.setColorScheme(newColorScheme);
+                            this.colorScheme = newColorScheme;
+                        }
+                    }),
+                );
             }
 
             // Connect Bridge & Get File concurrently
@@ -237,10 +237,24 @@ export class ZoteroReaderView extends ItemView {
             );
             // Initialize Reader if ready
             if (this.bridge.state === "bridge-ready") {
-                const opts = {
+                const themeOverrides = services.settings
+                    .readerFollowObsidianTheme
+                    ? { lightTheme: "obsidian", darkTheme: "obsidian" }
+                    : services.settings.readerFollowObsidianScheme
+                      ? {
+                            lightTheme: undefined,
+                            darkTheme: "dark",
+                        }
+                      : {
+                            lightTheme: "original_fallback",
+                            darkTheme: "original_fallback",
+                        };
+
+                const opts: Partial<CreateReaderOptions> = {
                     ...this.readerOptions,
                     colorScheme: this.colorScheme,
                     annotations: annotationJson,
+                    ...themeOverrides,
                 };
 
                 const contentType = this.attachmentItem.raw.data.contentType;
@@ -333,12 +347,12 @@ export class ZoteroReaderView extends ItemView {
 
     async onClose() {
         this.unsubscribeTaskMonitor?.();
-        if (this.colorSchemeObserver) {
-            this.colorSchemeObserver.disconnect();
-        }
         if (this.bridge) {
             await this.bridge.dispose();
         }
+
+        // Flush view state on close to ensure latest state is saved
+        services.viewStateService.flushViewStateSave();
     }
 
     /**

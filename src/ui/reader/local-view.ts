@@ -17,7 +17,6 @@ export const LOCAL_ZOTERO_READER_VIEW_TYPE = "zotflow-local-zotero-reader-view";
 export class LocalReaderView extends ItemView {
     private file: TFile | null = null;
     private bridge?: IframeReaderBridge;
-    private colorSchemeObserver?: MutationObserver;
     private colorScheme: ColorScheme = "light"; // Default to light
     private readerOptions: Partial<CreateReaderOptions> = {};
     private dataManager?: LocalDataManager;
@@ -144,19 +143,20 @@ export class LocalReaderView extends ItemView {
                     console.log("Set dark theme:", evt.theme);
                 });
 
-                // Observe color scheme changes once and delegate to bridge
-                this.colorSchemeObserver = new MutationObserver(() => {
-                    const newColorScheme = getComputedStyle(document.body)
-                        .colorScheme as ColorScheme;
-                    if (newColorScheme && newColorScheme !== this.colorScheme) {
-                        this.bridge!.setColorScheme(newColorScheme);
-                        this.colorScheme = newColorScheme;
-                    }
-                });
-                this.colorSchemeObserver.observe(document.body, {
-                    attributes: true,
-                    attributeFilter: ["class"],
-                });
+                // Observe color scheme changes via Obsidian's css-change event
+                this.registerEvent(
+                    this.app.workspace.on("css-change", () => {
+                        const newColorScheme = getComputedStyle(document.body)
+                            .colorScheme as ColorScheme;
+                        if (
+                            newColorScheme &&
+                            newColorScheme !== this.colorScheme
+                        ) {
+                            this.bridge!.setColorScheme(newColorScheme);
+                            this.colorScheme = newColorScheme;
+                        }
+                    }),
+                );
             }
 
             // Connect Bridge & Get File concurrently
@@ -168,22 +168,34 @@ export class LocalReaderView extends ItemView {
                 })(),
             ]);
 
-            console.log(this.bridge);
-
             // Initialize Reader if ready
             if (this.bridge.state === "bridge-ready") {
+                const themeOverrides = services.settings
+                    .readerFollowObsidianTheme
+                    ? { lightTheme: "obsidian", darkTheme: "obsidian" }
+                    : services.settings.readerFollowObsidianScheme
+                      ? {
+                            lightTheme: undefined,
+                            darkTheme: "dark",
+                        }
+                      : {
+                            lightTheme: "original_fallback",
+                            darkTheme: "original_fallback",
+                        };
+
+                const opts: Partial<CreateReaderOptions> = {
+                    ...this.readerOptions,
+                    colorScheme: this.colorScheme,
+                    annotations: loadedAnnotations,
+                    ...themeOverrides,
+                };
+
+                const type = this.getReaderType(file.extension);
+
                 // Read persisted view state from data.json
                 const viewState = services.viewStateService.getViewState(
                     file.path,
                 );
-
-                const opts = {
-                    ...this.readerOptions,
-                    colorScheme: this.colorScheme,
-                    annotations: loadedAnnotations,
-                };
-
-                const type = this.getReaderType(file.extension);
 
                 // Initialize Reader Logic
                 this.bridge.initReader({
@@ -253,12 +265,12 @@ export class LocalReaderView extends ItemView {
     }
 
     async onClose() {
-        if (this.colorSchemeObserver) {
-            this.colorSchemeObserver.disconnect();
-        }
         if (this.bridge) {
             await this.bridge.dispose();
         }
+
+        // Flush view state on close to ensure latest state is saved
+        services.viewStateService.flushViewStateSave();
     }
 
     /**

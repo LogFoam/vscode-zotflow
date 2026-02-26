@@ -28,6 +28,8 @@ export interface ZotFlowSettings {
     autoImportAnnotationImages: boolean;
     annotationImageFolder: string;
     overwriteViewer: boolean;
+    readerFollowObsidianTheme: boolean;
+    readerFollowObsidianScheme: boolean;
 }
 
 /** Persisted reader view state for a single attachment (local or zotero). */
@@ -63,6 +65,8 @@ export const DEFAULT_SETTINGS: ZotFlowSettings = {
     autoImportAnnotationImages: false,
     annotationImageFolder: "",
     overwriteViewer: false,
+    readerFollowObsidianTheme: false,
+    readerFollowObsidianScheme: true,
 };
 
 /** Default shape of the full `data.json` blob (settings + view states). */
