@@ -25,7 +25,7 @@ import {
 import { ZOTERO_READER_VIEW_TYPE, ZoteroReaderView } from "./ui/reader/view";
 import { TREE_VIEW_TYPE, ZotFlowTreeView } from "./ui/tree-view/view";
 import { services } from "./services/services";
-import { ZotFlowLockExtension } from "ui/zotflow-lock-extension";
+import { ZotFlowLockExtension } from "ui/editor/zotflow-lock-extension";
 
 import { openAttachment } from "ui/viewer";
 import { ActivityCenterModal } from "ui/activity-center/modal";
@@ -41,7 +41,7 @@ import {
     LOCAL_ZOTERO_READER_VIEW_TYPE,
     LocalReaderView,
 } from "ui/reader/local-view";
-import { ZotFlowCommentExtension } from "ui/zotflow-comment-extension";
+import { ZotFlowCommentExtension } from "ui/editor/zotflow-comment-extension";
 
 const SUPPORTED_EXTENSIONS = ["pdf", "epub", "html"];
 

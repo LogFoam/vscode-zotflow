@@ -45,6 +45,7 @@
         "dexie": "^4.2.1",
         "fflate": "^0.8.2",
         "liquidjs": "^10.24.0",
+        "monkey-around": "^3.0.0",
         "obsidian": "^1.11.4",
         "p-limit": "^7.2.0",
         "penpal": "^7.0.4",
