@@ -57,7 +57,7 @@ function resolveEditorPrototype(app: App): any {
     return MarkdownEditor.constructor;
 }
 
-interface MarkdownEditorProps {
+export interface MarkdownEditorProps {
     cursorLocation?: { anchor: number; head: number };
     value?: string;
     cls?: string;
@@ -145,6 +145,23 @@ export class EmbeddableMarkdownEditor {
         // Store reference to self for the patched method BEFORE using it
         const self = this;
 
+        const handleSuggestionPanelKeyEvent = (key: string) => {
+            const isSuggesting =
+                self.editor.editorSuggest.currentSuggest &&
+                //@ts-ignore
+                self.editor.editorSuggest.currentSuggest.isOpen;
+            // For suggesting, pass the event to the parent window
+            isSuggesting &&
+                //@ts-ignore
+                self.editor.editorSuggest.currentSuggest.suggestEl.dispatchEvent(
+                    new KeyboardEvent("keydown", {
+                        key: key,
+                    }),
+                );
+
+            return isSuggesting;
+        };
+
         // Use monkey-around to safely patch the method
         const uninstaller = around(EditorClass.prototype, {
             buildLocalExtensions: (originalMethod: any) =>
@@ -172,10 +189,35 @@ export class EmbeddableMarkdownEditor {
                                     if (self.options.onBlur) {
                                         self.options.onBlur(self);
                                     }
+                                    if (
+                                        document.querySelector(
+                                            "body > div.menu",
+                                        ) !== null
+                                    ) {
+                                        document.body.click();
+                                    }
                                 },
                                 focusin: () => {
                                     app.keymap.pushScope(self.scope);
                                     app.workspace.activeEditor = self.owner;
+                                },
+                                click: () => {
+                                    if (
+                                        document.querySelector(
+                                            "body > div.menu",
+                                        ) !== null
+                                    ) {
+                                        document.body.click();
+                                    }
+                                },
+                                contextmenu: () => {
+                                    if (
+                                        document.querySelector(
+                                            "body > div.menu",
+                                        ) !== null
+                                    ) {
+                                        document.body.click();
+                                    }
                                 },
                             }),
                         );
@@ -183,12 +225,27 @@ export class EmbeddableMarkdownEditor {
                         // Add keyboard handlers
                         const keyBindings = [
                             {
+                                key: "ArrowUp",
+                                run: () =>
+                                    handleSuggestionPanelKeyEvent("ArrowUp"),
+                            },
+                            {
+                                key: "ArrowDown",
+                                run: () =>
+                                    handleSuggestionPanelKeyEvent("ArrowDown"),
+                            },
+                            {
+                                key: "Tab",
+                                run: () => handleSuggestionPanelKeyEvent("Tab"),
+                            },
+                            {
                                 key: "Enter",
                                 run: () => {
-                                    return self.options.onEnter(
-                                        self,
-                                        false,
-                                        false,
+                                    return (
+                                        handleSuggestionPanelKeyEvent(
+                                            "Enter",
+                                        ) ||
+                                        self.options.onEnter(self, false, false)
                                     );
                                 },
                                 shift: () =>
@@ -241,12 +298,18 @@ export class EmbeddableMarkdownEditor {
                 },
         });
 
+        // Add obsidian-app class to the editor container, apply obsidian styles
+        container.classList.toggle("obsidian-app", true);
+        // Unset some unnecessary obsidian styles
+        container.style.contain = "content";
+
         // Create the editor with the app instance
         this.editor = new EditorClass(app, container, {
             app,
             // This mocks the MarkdownView functions, required for proper scrolling
             onMarkdownScroll: () => {},
             getMode: () => "source",
+            syncScroll: () => {},
         });
 
         // Register the uninstaller for cleanup
@@ -280,6 +343,9 @@ export class EmbeddableMarkdownEditor {
         if (options.cls && this.editorEl) {
             this.editorEl.classList.add(options.cls);
         }
+
+        // Set the font-size to 1em
+        this.editorEl.style.fontSize = "1em";
 
         // Set cursor position if specified
         if (options.cursorLocation && this.editor.editor?.cm) {

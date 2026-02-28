@@ -15,12 +15,16 @@ import { getBlobUrls } from "bundle-assets/inline-assets";
 import { services } from "services/services";
 import { workerBridge } from "bridge";
 
-import type { ZotFlowSettings } from "settings/types";
 import type { IDBZoteroItem } from "types/db-schema";
 import type { AttachmentData } from "types/zotero-item";
 import type { LocalDataManager } from "./local-data-manager";
 import { getLinkedSourceNote } from "utils/file";
 import type { TFile } from "obsidian";
+import {
+    createEmbeddableMarkdownEditor,
+    EmbeddableMarkdownEditor,
+    type MarkdownEditorProps,
+} from "ui/editor/markdown-editor";
 
 type BridgeState =
     | "idle"
@@ -52,7 +56,7 @@ export class IframeReaderBridge {
     private readyPromiseResolver: (() => void) | null = null;
     private readyPromiseRejecter: ((err: Error) => void) | null = null;
 
-    // private editorList: EmbeddableMarkdownEditor[] = [];
+    private editorList: EmbeddableMarkdownEditor[] = [];
     private _readerOpts: CreateReaderOptions | undefined;
 
     private token: string | null = null;
@@ -171,27 +175,28 @@ export class IframeReaderBridge {
                 dataTransfer.setData("text/plain", " ");
             },
 
-            // createAnnotationEditor: (
-            // 	container: HTMLElement,
-            // 	options: Partial<MarkdownEditorProps>
-            // ) => {
-            // 	const editor = createEmbeddableMarkdownEditor(
-            // 		(window as any).app,
-            // 		container as HTMLElement,
-            // 		{
-            // 			...options,
-            // 			onBlur: (editor) => {
-            // 				editor.activeCM.dispatch({
-            // 					effects: EditorView.scrollIntoView(0, {
-            // 						y: "start",
-            // 					}),
-            // 				});
-            // 			},
-            // 		}
-            // 	);
-            // 	this.editorList.push(editor);
-            // 	return editor;
-            // },
+            createAnnotationEditor: (
+                container: HTMLElement,
+                options: Partial<MarkdownEditorProps>,
+            ) => {
+                const editor = createEmbeddableMarkdownEditor(
+                    (window as any).app,
+                    container as HTMLElement,
+                    {
+                        ...options,
+                        onBlur: (editor) => {
+                            editor.activeCM.dispatch({
+                                effects: EditorView.scrollIntoView(0, {
+                                    y: "start",
+                                }),
+                            });
+                        },
+                    },
+                );
+                this.editorList.push(editor);
+                console.log("Created annotation editor", editor);
+                return editor;
+            },
         };
     }
 
@@ -438,7 +443,7 @@ export class IframeReaderBridge {
 
     async dispose(clearListeners = true) {
         if (this._state === "disposed") return;
-        // this.editorList.forEach((editor) => editor.onunload());
+        this.editorList.forEach((editor) => editor.onunload());
         this._state = "disposing";
         try {
             if (this.iframe?.contentWindow) {

@@ -1,4 +1,8 @@
 import { ZotFlowSettings } from "settings/types";
+import type {
+    MarkdownEditorProps,
+    EmbeddableMarkdownEditor,
+} from "ui/editor/markdown-editor";
 
 /** Reader color scheme. */
 export type ColorScheme = "light" | "dark";
@@ -76,6 +80,10 @@ export type ParentAPI = {
         annotations: AnnotationJSON[],
         fromText: boolean,
     ) => void;
+    createAnnotationEditor: (
+        container: HTMLElement,
+        options: Partial<MarkdownEditorProps>,
+    ) => EmbeddableMarkdownEditor;
 };
 
 /** Penpal API exposed by the reader iframe to the parent — init, navigate, annotate, destroy. */
