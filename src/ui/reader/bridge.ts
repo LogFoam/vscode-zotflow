@@ -8,7 +8,7 @@ import type {
 } from "types/zotero-reader";
 
 import { EditorView } from "@codemirror/view";
-import { Platform } from "obsidian";
+import { Component, MarkdownRenderer, Platform } from "obsidian";
 import { v4 as uuidv4 } from "uuid";
 import { connect, WindowMessenger } from "penpal";
 import { getBlobUrls } from "bundle-assets/inline-assets";
@@ -57,6 +57,7 @@ export class IframeReaderBridge {
     private readyPromiseRejecter: ((err: Error) => void) | null = null;
 
     private editorList: EmbeddableMarkdownEditor[] = [];
+    private rendererList: Component[] = [];
     private _readerOpts: CreateReaderOptions | undefined;
 
     private token: string | null = null;
@@ -194,8 +195,38 @@ export class IframeReaderBridge {
                     },
                 );
                 this.editorList.push(editor);
-                console.log("Created annotation editor", editor);
+                const originalOnunload = editor.onunload.bind(editor);
+                editor.onunload = () => {
+                    originalOnunload();
+                    const idx = this.editorList.indexOf(editor);
+                    if (idx !== -1) this.editorList.splice(idx, 1);
+                };
                 return editor;
+            },
+
+            renderMarkdownToContainer: (
+                container: HTMLElement,
+                text: string,
+            ) => {
+                const comp = new Component();
+                comp.load();
+                container.empty();
+                container.addClass("content");
+                MarkdownRenderer.render(
+                    services.app,
+                    text,
+                    container,
+                    "",
+                    comp,
+                );
+                this.rendererList.push(comp);
+                return {
+                    unload: () => {
+                        comp.unload();
+                        const idx = this.rendererList.indexOf(comp);
+                        if (idx !== -1) this.rendererList.splice(idx, 1);
+                    },
+                };
             },
         };
     }
@@ -444,6 +475,9 @@ export class IframeReaderBridge {
     async dispose(clearListeners = true) {
         if (this._state === "disposed") return;
         this.editorList.forEach((editor) => editor.onunload());
+        this.editorList.length = 0;
+        this.rendererList.forEach((comp) => comp.unload());
+        this.rendererList.length = 0;
         this._state = "disposing";
         try {
             if (this.iframe?.contentWindow) {

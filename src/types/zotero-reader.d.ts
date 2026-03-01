@@ -84,6 +84,10 @@ export type ParentAPI = {
         container: HTMLElement,
         options: Partial<MarkdownEditorProps>,
     ) => EmbeddableMarkdownEditor;
+    renderMarkdownToContainer: (
+        container: HTMLElement,
+        text: string,
+    ) => { unload: () => void };
 };
 
 /** Penpal API exposed by the reader iframe to the parent — init, navigate, annotate, destroy. */
