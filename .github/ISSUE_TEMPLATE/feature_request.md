@@ -1,11 +1,13 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: "[Feature Request]"
+title: "[Feature Request] "
 labels: enhancement
 assignees: duanxianpi
 
 ---
+
+**CHECK EXISTING FEATURE REQUESTS FIRST BEFORE CREATING A NEW ONE, THANKS!**
 
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]

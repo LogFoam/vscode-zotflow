@@ -7,6 +7,8 @@ assignees: duanxianpi
 
 ---
 
+**CHECK EXISTING ISSUES FIRST BEFORE CREATING A NEW ONE, THANKS!**
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
