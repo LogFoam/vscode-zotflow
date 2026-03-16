@@ -180,11 +180,25 @@ export class LocalDataManager {
     /** Write structured sidecar data to the .zf.json file. */
     private async writeJsonFile(annotations: AnnotationJSON[]) {
         const jsonPath = this.getJsonPath();
+
+        // Strip 'image' fields (base64 data)
+        const cleanedAnnotations = annotations.map((anno) => {
+            const { image, ...rest } = anno;
+            return rest;
+        });
+
         const data: ZotFlowSidecarData = {
             version: SIDECAR_VERSION,
-            annotations,
+            annotations: cleanedAnnotations,
         };
-        const content = JSON.stringify(data, null, 2);
+
+        let content = JSON.stringify(data, null, 2);
+
+        // Compact numeric arrays (e.g. paths, rects) to take less space
+        content = content.replace(/\[[\s\d.,-]+\]/g, (match) =>
+            match.replace(/\s+/g, " "),
+        );
+
         await saveTextFile(services.app, jsonPath, content);
     }
 

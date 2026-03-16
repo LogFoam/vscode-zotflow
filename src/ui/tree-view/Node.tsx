@@ -6,7 +6,7 @@ import { getAttachmentFileIcon, getItemTypeIcon } from "ui/icons";
 import { services } from "services/services";
 import { workerBridge } from "bridge";
 
-import { openAttachment } from "ui/viewer";
+import { openAttachment } from "utils/viewer";
 import { getNotePath } from "utils/utils";
 
 /** Pixel indentation per tree depth level. */

@@ -203,7 +203,7 @@ const exposedApi: WorkerAPI = {
 
             _annotation = new AnnotationService(_note, parentHost);
             _key = new KeyService(_zotero, parentHost);
-            _dbHelper = new DbHelperService(parentHost);
+            _dbHelper = new DbHelperService(settings, parentHost);
 
             _taskManager = new TaskManager(parentHost);
 
@@ -431,6 +431,7 @@ const exposedApi: WorkerAPI = {
 
         _localNote!.updateSettings(settings);
         _localTemplate!.updateSettings(settings);
+        _dbHelper!.updateSettings(settings);
         _pdfProcessor!.updateSettings(settings);
         _currentSettings = settings;
     },
