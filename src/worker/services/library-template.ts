@@ -17,6 +17,7 @@ import type { ZotFlowSettings } from "settings/types";
 import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
 import { getAnnotationJson } from "db/annotation";
 import type { AnnotationJSON } from "types/zotero-reader";
+import type { DbHelperService } from "./db-helper";
 
 const DEFAULT_ITEM_TEMPLATE = `---
 citationKey: {{ item.citationKey | json }}
@@ -98,6 +99,7 @@ export class LibraryTemplateService {
     constructor(
         private settings: ZotFlowSettings,
         private parentHost: IParentProxy,
+        private dbHelper: DbHelperService,
     ) {
         this.initialize();
     }
@@ -273,11 +275,22 @@ export class LibraryTemplateService {
             }));
         }
 
+        const itemPaths = await this.dbHelper
+            .getItemPaths([
+                {
+                    libraryID: item.libraryID,
+                    key: item.key,
+                    collections: item.collections,
+                },
+            ])
+            .then((paths) => paths[`${item.libraryID}:${item.key}`] || []);
+
         return {
             key: item.key,
             version: item.version,
             libraryID: item.libraryID,
             citationKey: item.citationKey || "",
+            itemPaths: itemPaths,
             notes,
             annotations,
             attachmentAnnotations,

@@ -4,6 +4,7 @@ import type { AnyIDBZoteroItem } from "types/db-schema";
 import type { TFileWithoutParentAndVault } from "types/zotflow";
 import { db } from "db/db";
 import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
+import type { DbHelperService } from "./db-helper";
 
 const FALLBACK_ZOTERO_TEMPLATE =
     "Source/{{libraryName}}/@{{citationKey | default: title | default: key}}";
@@ -25,22 +26,23 @@ function sanitizeSegment(segment: string): string {
     return s;
 }
 
-/** Keys that hold date/time values and should not be sanitized (colons are valid in ISO 8601). */
-const DATE_KEYS: ReadonlySet<string> = new Set([
+/** Keys should not be sanitized (e.g., date fields, path fields). */
+const IGNORE_KEYS: ReadonlySet<string> = new Set([
     "date",
     "dateAdded",
     "dateModified",
     "accessDate",
+    "itemPaths",
 ]);
 
-/** Sanitize all string values in a template context object, skipping date fields. */
+/** Sanitize all string values in a template context object, skipping ignored fields. */
 function sanitizeContext(
     ctx: Record<string, unknown>,
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(ctx)) {
         if (typeof value === "string") {
-            result[key] = DATE_KEYS.has(key) ? value : sanitizeSegment(value);
+            result[key] = IGNORE_KEYS.has(key) ? value : sanitizeSegment(value);
         } else if (
             Array.isArray(value) &&
             value.length > 0 &&
@@ -49,7 +51,12 @@ function sanitizeContext(
             result[key] = value.map((item: Record<string, unknown>) => {
                 const cleaned: Record<string, unknown> = {};
                 for (const [k, v] of Object.entries(item)) {
-                    cleaned[k] = typeof v === "string" ? sanitizeSegment(v) : v;
+                    cleaned[k] =
+                        typeof v === "string"
+                            ? IGNORE_KEYS.has(k)
+                                ? v
+                                : sanitizeSegment(v)
+                            : v;
                 }
                 return cleaned;
             });
@@ -71,7 +78,10 @@ function sanitizePath(rawPath: string): string {
 export class NotePathService {
     private engine: Liquid;
 
-    constructor(private settings: ZotFlowSettings) {
+    constructor(
+        private settings: ZotFlowSettings,
+        private dbHelper: DbHelperService,
+    ) {
         this.engine = new Liquid({ greedy: false });
     }
 
@@ -108,6 +118,16 @@ export class NotePathService {
             );
         }
 
+        const itemPaths = await this.dbHelper
+            .getItemPaths([
+                {
+                    libraryID: item.libraryID,
+                    key: item.key,
+                    collections: item.collections,
+                },
+            ])
+            .then((paths) => paths[`${item.libraryID}:${item.key}`] || []);
+
         const context = {
             // Identity
             key: item.key,
@@ -115,6 +135,7 @@ export class NotePathService {
             citationKey: item.citationKey || "",
             libraryID: item.libraryID,
             itemType: item.itemType,
+            itemPaths: itemPaths,
 
             // Metadata
             title: item.title || "",

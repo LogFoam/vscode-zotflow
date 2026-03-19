@@ -173,6 +173,7 @@ const exposedApi: WorkerAPI = {
 
         try {
             _zotero = new ZoteroAPIService(settings.zoteroapikey);
+            _dbHelper = new DbHelperService(settings, parentHost);
             _webdav = new WebDavService(settings, parentHost);
             _attachment = new AttachmentService(
                 _webdav,
@@ -189,8 +190,12 @@ const exposedApi: WorkerAPI = {
                 blobUrls,
             );
 
-            _template = new LibraryTemplateService(settings, parentHost);
-            _notePath = new NotePathService(settings);
+            _template = new LibraryTemplateService(
+                settings,
+                parentHost,
+                _dbHelper,
+            );
+            _notePath = new NotePathService(settings, _dbHelper);
             _libraryNote = new LibraryNoteService(
                 settings,
                 _template,
@@ -212,7 +217,6 @@ const exposedApi: WorkerAPI = {
 
             _annotation = new AnnotationService(_libraryNote, parentHost);
             _key = new KeyService(_zotero, parentHost);
-            _dbHelper = new DbHelperService(settings, parentHost);
 
             _taskManager = new TaskManager(parentHost);
 

@@ -14,6 +14,7 @@ export interface ItemTemplateContext {
     citationKey: string;
     libraryID: number;
     itemType: string;
+    itemPaths: string[];
 
     // Metadata
     title: string;
