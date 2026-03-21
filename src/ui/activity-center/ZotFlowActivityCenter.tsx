@@ -12,8 +12,8 @@ export const ZotFlowActivityCenter: React.FC = () => {
     const tabs = [
         { id: "sync", label: "Sync", icon: "refresh-cw" },
         { id: "tasks", label: "Tasks", icon: "list" },
-        { id: "telemetry", label: "Telemetry", icon: "activity" },
         { id: "template", label: "Template", icon: "code" },
+        { id: "telemetry", label: "Telemetry", icon: "activity" },
     ];
 
     return (

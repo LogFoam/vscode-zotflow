@@ -35,6 +35,8 @@ import type { AttachmentData } from "types/zotero-item";
 import type { AnnotationJSON } from "types/zotero-reader";
 
 import type { App } from "obsidian";
+import type { AttachmentIdentifier } from "worker/tasks/impl/batch-extract-external-annotations-task";
+
 import { services } from "services/services";
 import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
 
@@ -230,7 +232,7 @@ export class WorkerBridge {
     }
 
     async extractExternalAnnotations(
-        items: ItemIdentifier[],
+        items: AttachmentIdentifier[],
     ): Promise<AnnotationJSON[]> {
         this.assertInitialized();
         return this._api.extractExternalAnnotations(items);

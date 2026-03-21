@@ -20,6 +20,7 @@ import type { AnnotationJSON } from "types/zotero-reader";
 export class TaskManager {
     private tasks: Map<string, BaseTask> = new Map();
     private activeControllers: Map<string, AbortController> = new Map();
+    private activeExtractions = new Map<string, Promise<AnnotationJSON[]>>();
 
     constructor(private parentHost: IParentProxy) {}
 
@@ -149,6 +150,17 @@ export class TaskManager {
         pdfProcessor: PDFProcessWorker,
         input: BatchExtractExternalAnnotationsInput,
     ): Promise<AnnotationJSON[]> {
+        // Dedup: if all requested items already have in-flight extractions,
+        // return the existing promises instead of creating a new task.
+        const keys = input.items.map((i) => `${i.libraryID}:${i.itemKey}`);
+        const allInFlight = keys.every((k) => this.activeExtractions.has(k));
+        if (allInFlight && keys.length > 0) {
+            const results = await Promise.all(
+                keys.map((k) => this.activeExtractions.get(k)!),
+            );
+            return results.flat();
+        }
+
         const { BatchExtractExternalAnnotationsTask } =
             await import("./impl/batch-extract-external-annotations-task");
         const task = new BatchExtractExternalAnnotationsTask(
@@ -162,11 +174,22 @@ export class TaskManager {
         const controller = new AbortController();
         this.activeControllers.set(task.id, controller);
 
-        try {
-            await task.execute(controller.signal);
+        const promise = task.execute(controller.signal).then(() => {
             return task.getExtractedAnnotations();
+        });
+
+        // Register each item key as in-flight
+        for (const key of keys) {
+            this.activeExtractions.set(key, promise);
+        }
+
+        try {
+            return await promise;
         } finally {
             this.activeControllers.delete(task.id);
+            for (const key of keys) {
+                this.activeExtractions.delete(key);
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
+import SparkMD5 from "spark-md5";
 import { workerBridge } from "bridge";
 import { IframeReaderBridge } from "./bridge";
 import { services } from "services/services";
@@ -33,6 +34,8 @@ export class ZoteroReaderView extends ItemView {
     private colorScheme: ColorScheme = "light"; // Default to light
     private unsubscribeTaskMonitor?: () => void;
     private lastSyncTaskStatuses = new Map<string, ITaskInfo["status"]>();
+    /** MD5 of the file blob used to init the reader, for extraction skip check. */
+    private fileBlobMD5?: string;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -325,9 +328,12 @@ export class ZoteroReaderView extends ItemView {
                         : "";
 
                 // Initialize Reader Logic
+                const fileBuf = await fileBlob.arrayBuffer();
+                this.fileBlobMD5 = SparkMD5.ArrayBuffer.hash(fileBuf);
+
                 this.bridge.initReader({
                     data: {
-                        buf: new Uint8Array(await fileBlob.arrayBuffer()),
+                        buf: new Uint8Array(fileBuf),
                         url: null,
                     },
                     type: type,
@@ -335,11 +341,11 @@ export class ZoteroReaderView extends ItemView {
                     ...opts,
                 });
 
-                // Extract external annotations
-                this.extractExternalAnnotation();
-
                 // Subscribe to sync events for live annotation updates
                 this.subscribeToSyncEvents();
+
+                // Extract external annotations
+                this.extractExternalAnnotation();
             }
         } catch (e: any) {
             services.logService.error(
@@ -404,6 +410,12 @@ export class ZoteroReaderView extends ItemView {
     private subscribeToSyncEvents() {
         // Avoid double-subscribe
         this.unsubscribeTaskMonitor?.();
+
+        // Snapshot current task statuses so the initial callback
+        // (fired immediately by subscribe()) is a no-op.
+        for (const task of services.taskMonitor.getTasks()) {
+            this.lastSyncTaskStatuses.set(task.id, task.status);
+        }
 
         this.unsubscribeTaskMonitor = services.taskMonitor.subscribe(
             (tasks: ITaskInfo[]) => {
@@ -488,13 +500,11 @@ export class ZoteroReaderView extends ItemView {
             this.attachmentItem.raw.data.contentType === "application/pdf";
         if (!isPDF) return;
 
-        const currentMD5 = this.attachmentItem.raw.data.md5;
+        const currentMD5 = this.attachmentItem.raw.data.md5 || this.fileBlobMD5;
         const lastExtractionMD5 =
             this.attachmentItem.externalAnnotationExtractionFileMD5;
 
         // Fast pre-check: only skip when server MD5 is available and matches.
-        // For linked files (no server MD5), let the worker-side task handle
-        // dedup via computed file MD5.
         if (currentMD5 && currentMD5 === lastExtractionMD5) {
             services.logService.log(
                 "debug",
@@ -509,6 +519,7 @@ export class ZoteroReaderView extends ItemView {
                 {
                     libraryID: this.attachmentItem.libraryID,
                     itemKey: this.attachmentItem.key,
+                    precomputedMD5: this.fileBlobMD5,
                 },
             ]);
 
