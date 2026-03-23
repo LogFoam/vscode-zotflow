@@ -200,7 +200,7 @@ export class LibraryNoteService {
      * Core logic: Ensure note is ready
      * Responsible for routing logic: Index lookup -> Default path fallback -> Existence check -> Create/Update
      */
-    private async ensureNote(
+    async ensureNote(
         libraryID: number,
         key: string,
         options: UpdateOptions,
@@ -227,10 +227,7 @@ export class LibraryNoteService {
 
             // If Cache lookup fails, resolve path from template
             if (!path) {
-                path = await this.notePathService.resolveLibraryNotePath(
-                    item,
-                    library.name,
-                );
+                path = await this.notePathService.resolveLibraryNotePath(item);
             }
 
             // Check physical file status
@@ -319,7 +316,7 @@ export class LibraryNoteService {
         );
 
         // Render Item may throw ZotFlowError (Template Error), let it bubble
-        const content = await this.templateService.renderItem(
+        const content = await this.templateService.renderLibrarySourceNote(
             item,
             templateContent,
             {},
@@ -348,7 +345,7 @@ export class LibraryNoteService {
                 this.settings.librarySourceNoteTemplatePath,
             );
 
-            const content = await this.templateService.renderItem(
+            const content = await this.templateService.renderLibrarySourceNote(
                 item,
                 templateContent,
                 fileCheck.frontmatter || {},

@@ -54,6 +54,32 @@ export class AnnotationService {
         );
     }
 
+    /**
+     * Return all annotations across all child attachments of a parent item.
+     * Used by the template preview UI for citation annotation context.
+     */
+    async getAllItemAnnotations(
+        libraryID: number,
+        itemKey: string,
+        apiKey: string,
+    ): Promise<AnnotationJSON[]> {
+        const children = await db.items
+            .where(["libraryID", "parentItem", "itemType", "trashed"])
+            .equals([libraryID, itemKey, "attachment", 0])
+            .toArray();
+
+        const results: AnnotationJSON[] = [];
+        for (const child of children) {
+            const annots = await getAnnotationJson(
+                child as IDBZoteroItem<AttachmentData>,
+                apiKey,
+                (item) => item.syncStatus !== "deleted",
+            );
+            results.push(...annots);
+        }
+        return results;
+    }
+
     /* ================================================================ */
     /*  Mutations                                                      */
     /* ================================================================ */

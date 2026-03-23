@@ -45,6 +45,7 @@ import {
     LocalReaderView,
 } from "ui/reader/local-view";
 import { ZotFlowCommentExtension } from "ui/editor/zotflow-comment-extension";
+import { CitationSuggest } from "ui/editor/citation-suggest";
 
 const SUPPORTED_EXTENSIONS = ["pdf", "epub", "html"];
 
@@ -53,6 +54,7 @@ export default class ZotFlow extends Plugin {
     settings: ZotFlowSettings;
     viewStates: Record<string, ViewStateEntry>;
     customThemes: CustomReaderTheme[] = [];
+    private citationSuggest: CitationSuggest;
 
     async onload() {
         // Load settings
@@ -103,7 +105,11 @@ export default class ZotFlow extends Plugin {
 
         // Register lock extension
         this.registerEditorExtension([ZotFlowLockExtension()]);
-        this.registerEditorExtension([ZotFlowCommentExtension()]);
+        // this.registerEditorExtension([ZotFlowCommentExtension()]);
+
+        // Register citation suggest
+        this.citationSuggest = new CitationSuggest();
+        this.registerEditorSuggest(this.citationSuggest);
 
         // Register protocol handler for zotflow URIs
         // Usage: obsidian://zotflow?filePath=path/to/file.md
@@ -177,6 +183,15 @@ export default class ZotFlow extends Plugin {
 
         this.addRibbonIcon("zotero-search", "ZotFlow: Search Zotero", () => {
             new ZoteroSearchModal(this.app, this.settings).open();
+        });
+
+        this.addCommand({
+            id: "insert-citation",
+            name: "Insert Citation",
+            editorCallback: () => {
+                this.citationSuggest.triggerManually();
+            },
+            hotkeys: [{ modifiers: ["Alt"], key: "c" }],
         });
 
         this.addCommand({

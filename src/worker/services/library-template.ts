@@ -18,6 +18,8 @@ import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
 import { getAnnotationJson } from "db/annotation";
 import type { AnnotationJSON } from "types/zotero-reader";
 import type { DbHelperService } from "./db-helper";
+import type { NotePathService } from "./note-path";
+import type { CitationInput } from "services/citation-service";
 
 const DEFAULT_ITEM_TEMPLATE = `---
 citationKey: {{ item.citationKey | json }}
@@ -92,6 +94,18 @@ doi: {{ item.DOI | json }}
 {%- endif -%}
 `;
 
+const FALLBACK_WIKILINK_TEMPLATE = `{%- if annotation -%}
+[[{{ notePath }}#^{{ annotation.key }}|{{ item.creators[0].name | default: "Unknown" }} ({{ item.date | slice: 0, 4 }}), p. {{ annotation.pageLabel }}]] {%- else -%}
+[[{{ notePath }}|{{ item.creators[0].name | default: "Unknown" }} ({{ item.date | slice: 0, 4 }})]] {%- endif -%}`;
+
+const FALLBACK_PANDOC_TEMPLATE =
+    "[@{{ item.citationKey | default: item.key }}{% if annotation and annotation.pageLabel %}, p. {{ annotation.pageLabel }}{% endif %}]";
+
+const FALLBACK_FOOTNOTE_TEMPLATE = `{%- if item.creators.length > 1 -%}
+{{ item.creators[0].name }} et al. {%- elsif item.creators.length == 1 -%}
+{{ item.creators[0].name }} {%- else -%}
+Unknown Author {%- endif -%}, *{{ item.title }}* ({{ item.date | slice: 0, 4 }}){% if annotation and annotation.pageLabel %}, p. {{ annotation.pageLabel }}{% endif %}.`;
+
 /** LiquidJS template engine for rendering library (Zotero) item source notes. */
 export class LibraryTemplateService {
     private engine: Liquid;
@@ -100,6 +114,7 @@ export class LibraryTemplateService {
         private settings: ZotFlowSettings,
         private parentHost: IParentProxy,
         private dbHelper: DbHelperService,
+        private notePathService: NotePathService,
     ) {
         this.initialize();
     }
@@ -124,7 +139,7 @@ export class LibraryTemplateService {
         this.settings = newSettings;
     }
 
-    async renderItem(
+    async renderLibrarySourceNote(
         item: AnyIDBZoteroItem,
         templateContent: string | null,
         originalFrontmatter: Record<string, any> = {},
@@ -205,12 +220,127 @@ export class LibraryTemplateService {
         }
     }
 
+    /** Preview-render a library item with the given template content. */
+    async previewLibrarySourceNote(
+        libraryID: number,
+        key: string,
+        templateContent: string,
+    ): Promise<string> {
+        const item = await db.items.get([libraryID, key]);
+        if (!item) {
+            throw new ZotFlowError(
+                ZotFlowErrorCode.RESOURCE_MISSING,
+                "LibraryTemplateService",
+                `Item not found: ${libraryID}/${key}`,
+            );
+        }
+        return this.renderLibrarySourceNote(item, templateContent, {});
+    }
+
+    /** Return the user-configured template file content, or the built-in default. */
+    async getDefaultTemplate(): Promise<string> {
+        const path = this.settings.librarySourceNoteTemplatePath;
+        if (path) {
+            try {
+                const content = await this.parentHost.readTextFile(path);
+                if (content != null) return content;
+            } catch {
+                // Fall through to default
+            }
+        }
+        return DEFAULT_ITEM_TEMPLATE;
+    }
+
+    /** Render a citation template for an item, with notePath in the context. */
+    async renderCitationTemplate(
+        input: CitationInput,
+        notePath: string,
+        format: "pandoc" | "wikilink" | "footnote",
+    ): Promise<string> {
+        let template: string;
+        if (format === "pandoc") {
+            template =
+                this.settings.citationPandocTemplate.trim() ||
+                FALLBACK_PANDOC_TEMPLATE;
+        } else if (format === "wikilink") {
+            template = this.settings.citationWikilinkTemplate.trim();
+        } else {
+            template =
+                this.settings.citationFootnoteTemplate.trim() ||
+                FALLBACK_FOOTNOTE_TEMPLATE;
+        }
+
+        if (!template) return "";
+
+        const item = await db.items.get([input.item.libraryID, input.item.key]);
+        if (!item) {
+            throw new ZotFlowError(
+                ZotFlowErrorCode.RESOURCE_MISSING,
+                "LibraryTemplateService",
+                `Item not found: ${input.item.libraryID}/${input.item.key}`,
+            );
+        }
+
+        const context = {} as any;
+        context.item = await this.mapToItemContext(item);
+        context.notePath = notePath;
+        if (input.annotation) {
+            context.annotation = this.mapToAnnotationContext(input.annotation);
+        }
+
+        return this.engine.parseAndRender(template, context);
+    }
+
+    /** Preview a citation template for a library item (no file creation). */
+    async previewCitationTemplate(
+        input: CitationInput,
+        template: string,
+    ): Promise<string> {
+        const item = await db.items.get([input.item.libraryID, input.item.key]);
+        if (!item) {
+            throw new ZotFlowError(
+                ZotFlowErrorCode.RESOURCE_MISSING,
+                "LibraryTemplateService",
+                `Item not found: ${input.item.libraryID}/${input.item.key}`,
+            );
+        }
+        const notePath =
+            await this.notePathService.resolveLibraryNotePath(item);
+        const context = {} as any;
+        context.item = await this.mapToItemContext(item);
+        context.notePath = notePath;
+        if (input.annotation) {
+            context.annotation = this.mapToAnnotationContext(input.annotation);
+        }
+        return this.engine.parseAndRender(template, context);
+    }
+
+    /** Return the current citation template from settings. */
+    getDefaultCitationTemplate(
+        format: "pandoc" | "wikilink" | "footnote",
+    ): string {
+        if (format === "pandoc") {
+            return (
+                this.settings.citationPandocTemplate || FALLBACK_PANDOC_TEMPLATE
+            );
+        }
+        if (format === "wikilink") {
+            return (
+                this.settings.citationWikilinkTemplate ||
+                FALLBACK_WIKILINK_TEMPLATE
+            );
+        }
+        return (
+            this.settings.citationFootnoteTemplate || FALLBACK_FOOTNOTE_TEMPLATE
+        );
+    }
+
     private sanitizeQuotesString(str: string): string {
         // Escape >, < into \>, \<
         return str.replace(/>/g, "\\>").replace(/</g, "\\<");
     }
 
-    public async prepareItemContext(item: AnyIDBZoteroItem): Promise<any> {
+    private async prepareItemContext(item: AnyIDBZoteroItem): Promise<any> {
         return {
             item: await this.mapToItemContext(item),
             settings: {
@@ -221,7 +351,7 @@ export class LibraryTemplateService {
         };
     }
 
-    public async mapToItemContext(
+    private async mapToItemContext(
         item: AnyIDBZoteroItem,
     ): Promise<ItemTemplateContext> {
         const raw = item.raw || {};
@@ -320,7 +450,7 @@ export class LibraryTemplateService {
         };
     }
 
-    public async mapToNoteContext(
+    private async mapToNoteContext(
         item: IDBZoteroItem<NoteData>,
     ): Promise<NoteTemplateContext> {
         const data = item.raw.data || {};
@@ -335,7 +465,7 @@ export class LibraryTemplateService {
         };
     }
 
-    public mapToAnnotationContext(
+    private mapToAnnotationContext(
         annotation: AnnotationJSON,
     ): AnnotationTemplateContext {
         return {
@@ -355,7 +485,7 @@ export class LibraryTemplateService {
         };
     }
 
-    public async mapToAttachmentContext(
+    private async mapToAttachmentContext(
         item: IDBZoteroItem<AttachmentData>,
     ): Promise<AttachmentTemplateContext> {
         const annotations = (
@@ -378,36 +508,5 @@ export class LibraryTemplateService {
 
             annotations,
         };
-    }
-
-    /** Preview-render a library item with the given template content. */
-    async previewItem(
-        libraryID: number,
-        key: string,
-        templateContent: string,
-    ): Promise<string> {
-        const item = await db.items.get([libraryID, key]);
-        if (!item) {
-            throw new ZotFlowError(
-                ZotFlowErrorCode.RESOURCE_MISSING,
-                "LibraryTemplateService",
-                `Item not found: ${libraryID}/${key}`,
-            );
-        }
-        return this.renderItem(item, templateContent, {});
-    }
-
-    /** Return the user-configured template file content, or the built-in default. */
-    async getDefaultTemplate(): Promise<string> {
-        const path = this.settings.librarySourceNoteTemplatePath;
-        if (path) {
-            try {
-                const content = await this.parentHost.readTextFile(path);
-                if (content != null) return content;
-            } catch {
-                // Fall through to default
-            }
-        }
-        return DEFAULT_ITEM_TEMPLATE;
     }
 }

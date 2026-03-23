@@ -14,6 +14,7 @@ export enum ZotFlowErrorCode {
     PARSE_ERROR = "PARSE_ERROR",
     TIMEOUT = "TIMEOUT",
     UNKNOWN = "UNKNOWN",
+    TEMPLATE_RENDER_ERROR = "TEMPLATE_RENDER_ERROR",
 }
 
 /**

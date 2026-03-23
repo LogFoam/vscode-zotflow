@@ -189,13 +189,14 @@ const exposedApi: WorkerAPI = {
                 parentHost,
                 blobUrls,
             );
+            _notePath = new NotePathService(settings, _dbHelper);
 
             _template = new LibraryTemplateService(
                 settings,
                 parentHost,
                 _dbHelper,
+                _notePath,
             );
-            _notePath = new NotePathService(settings, _dbHelper);
             _libraryNote = new LibraryNoteService(
                 settings,
                 _template,

@@ -107,6 +107,15 @@
     padding-top: 0;
 }
 
+/* Empty State */
+.suggestion-item.zotflow-suggestion-empty {
+    background-color: transparent !important;
+    font-size: var(--font-ui-smaller);
+    pointer-events: none;
+    border-bottom: none;
+    text-align: center;
+}
+
 /* Reset Padding */
 .suggestion-item.zotflow-suggestion-header .zotflow-search-item {
     padding: 0;
@@ -1461,6 +1470,13 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
+}
+
+.zotflow-template-test-annotation-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-1);
 }
 
 .zotflow-template-test-selection {

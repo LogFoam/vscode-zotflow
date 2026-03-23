@@ -11,7 +11,7 @@ export type ReaderColorScheme =
     | "obsidian-theme";
 
 /** Settings tab identifier. */
-export type TabSection = "sync" | "webdav" | "cache" | "general";
+export type TabSection = "sync" | "webdav" | "cache" | "general" | "citation";
 
 /** Sort order for collections in the tree view. */
 export type CollectionSortOrder = "name-asc" | "name-desc";
@@ -24,6 +24,9 @@ export type ItemSortOrder =
     | "modified-old"
     | "added-new"
     | "added-old";
+
+/** Citation insertion format. */
+export type CitationFormat = "pandoc" | "footnote" | "wikilink" | "citekey";
 
 /** Per-library sync configuration. */
 export interface LibraryConfig {
@@ -57,6 +60,11 @@ export interface ZotFlowSettings {
     treeCollectionSort: CollectionSortOrder;
     treeItemSort: ItemSortOrder;
     linkedAttachmentBaseDir: string;
+    defaultCitationFormat: CitationFormat;
+    citationTrigger: string;
+    citationPandocTemplate: string;
+    citationFootnoteTemplate: string;
+    citationWikilinkTemplate: string;
 }
 
 /** Persisted reader view state for a single attachment (local or zotero). */
@@ -104,6 +112,14 @@ export const DEFAULT_SETTINGS: ZotFlowSettings = {
     treeCollectionSort: "name-asc",
     treeItemSort: "title-asc",
     linkedAttachmentBaseDir: "",
+    defaultCitationFormat: "pandoc",
+    citationTrigger: "@@",
+    citationPandocTemplate:
+        "[@{{ item.citationKey | default: item.key }}{% if annotation and annotation.pageLabel %}, p. {{ annotation.pageLabel }}{% endif %}]",
+    citationFootnoteTemplate:
+        "{%- if item.creators.length > 1 -%}\n{{ item.creators[0].name }} et al. {%- elsif item.creators.length == 1 -%}\n{{ item.creators[0].name }} {%- else -%}\nUnknown Author {%- endif -%}, *{{ item.title }}* ({{ item.date | slice: 0, 4 }}){% if annotation and annotation.pageLabel %}, p. {{ annotation.pageLabel }}{% endif %}.",
+    citationWikilinkTemplate:
+        '{%- if annotation -%}\n[[{{ notePath }}#^{{ annotation.key }}|{{ item.creators[0].name | default: "Unknown" }} ({{ item.date | slice: 0, 4 }}), p. {{ annotation.pageLabel }}]] {%- else -%}\n[[{{ notePath }}|{{ item.creators[0].name | default: "Unknown" }} ({{ item.date | slice: 0, 4 }})]] {%- endif -%}',
 };
 
 /** Default shape of the full `data.json` blob (settings + view states). */

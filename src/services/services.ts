@@ -3,6 +3,7 @@ import { LogService } from "./log-service";
 import { NotificationService } from "./notification-service";
 import { ViewStateService } from "./view-state-service";
 import { TaskMonitor } from "./task-monitor";
+import { CitationService } from "./citation-service";
 import { ZotFlowError, ZotFlowErrorCode } from "utils/error";
 
 import type { App } from "obsidian";
@@ -20,6 +21,7 @@ class ServiceLocator {
     private _notificationService: NotificationService;
     private _viewStateService: ViewStateService;
     private _taskMonitor: TaskMonitor;
+    private _citationService: CitationService;
 
     initialize(plugin: ZotFlow, settings: ZotFlowSettings) {
         this._plugin = plugin;
@@ -37,6 +39,7 @@ class ServiceLocator {
         this._indexService.load();
 
         this._taskMonitor = new TaskMonitor(this._app);
+        this._citationService = new CitationService();
 
         this._initialized = true;
         this._logService.info("Services initialized.", "LocalServiceLocator");
@@ -100,6 +103,11 @@ class ServiceLocator {
     get taskMonitor() {
         this.assertInitialized();
         return this._taskMonitor;
+    }
+
+    get citationService() {
+        this.assertInitialized();
+        return this._citationService;
     }
 }
 
