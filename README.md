@@ -2,65 +2,103 @@
 
 ZotFlow is a community plugin for [Obsidian](https://obsidian.md) that deeply integrates [Zotero](https://www.zotero.org) into your note-taking workflow. It syncs your Zotero libraries, lets you read and annotate PDFs/EPUBs/snapshots directly inside Obsidian, and automatically generates richly-templated source notes — all without leaving your vault.
 
+If you have any of the following requirements, it will worth giving ZotFlow a try:
+
+- You want to keep your Zotero library in **sync** with Obsidian, including annotations and metadata.
+- You want to **read and annotate PDFs/EPUBs** without switching apps or breaking your flow.
+- You want to annotate attachments in **Obsidian Markdown format**, with support for text, highlights, images, and ink.
+- You want a immersive reading experience with your **Obsidian theme and custom CSS**.
+- You want your source notes to be **automatically generated** and updated based on your Zotero items and annotations.
+- You want to **cite** your literature in Obsidian with different formats (pandoc, wiki link, footnote).
+- ...
+
 ## Features
 
-### Zotero Library Sync
+### Read & Annotate Inside Obsidian
 
-- **Bidirectional sync** — pull items from Zotero and push local changes (annotations, metadata) back.
-- **Per-library control** — configure each library as _Bidirectional_, _Read-Only_, or _Ignored_.
-- **Conflict resolution** — field-level diff viewer with _Keep Local_ / _Accept Remote_ actions and batch resolve.
-- **WebDAV support** — download attachments from your own WebDAV server in addition to Zotero cloud storage.
+Read PDFs, EPUBs, and HTML snapshots without leaving Obsidian. Highlight, underline, draw, add notes — all annotation types are supported, and everything stays in sync with your Zotero library. The built-in reader is fully themed to match your Obsidian setup.
 
-### Built-in Reader
+<!-- TODO: replace with actual GIF -->
 
-- **Read PDFs, EPUBs, and HTML snapshots** inside Obsidian — no external app needed.
-- **Full annotation support** — highlights, underlines, notes, text selections, images, and ink drawings.
-- **Local reader mode** — open any PDF/EPUB/HTML file in your vault with the same reader.
-- **Live annotation refresh** — annotations update automatically after a sync completes.
-- Optionally **replace Obsidian's default viewer** for PDF/EPUB/HTML files.
+![Built-in Reader](docs/assets/reader-placeholder.gif)
 
-### Source Notes
+### Annotate Local Vault Files
 
-ZotFlow's source notes follow a **Zettelkasten-inspired** philosophy: each Zotero item gets exactly one atomic note that serves as a permanent reference node in your knowledge graph. The generated note captures bibliographic metadata and your annotations in a structured, reproducible format — acting as a _literature note_ in Zettelkasten terms. Because these notes are auto-generated and locked, they stay faithful to the source material. Your own ideas, interpretations, and connections belong in separate _permanent notes_ that **link back** to the source note, keeping the boundary between "what the author said" and "what I think" clean. This makes source notes stable anchor points you can link to from anywhere in your vault without worrying about drift.
+Open **any** PDF or EPUB already in your vault with the same full-featured reader. Annotations are saved alongside the file — no Zotero account required.
 
-- **Template-powered** — use [LiquidJS](https://liquidjs.com) templates to control exactly how Zotero items are rendered as Markdown notes.
-- **Separate templates** for Zotero items and local vault files.
-- **Auto-update** — source notes regenerate when annotations change.
-- **Annotation images** — visual annotations (image/ink) can be auto-extracted and saved to your vault.
-- **Locked notes** — generated notes are marked `zotflow-locked` so they open in preview mode, preventing accidental edits.
+<!-- TODO: replace with actual GIF -->
+
+![Local Reader](docs/assets/local-reader-placeholder.gif)
+
+### Bidirectional Sync
+
+Pull items from Zotero **and push changes back** — annotations, metadata, everything. Configure each library as _Bidirectional_, _Read-Only_, or _Ignored_. When conflicts arise, a field-level diff viewer lets you pick _Keep Local_ or _Accept Remote_.
+
+<!-- TODO: replace with actual GIF -->
+
+![Bidirectional Sync](docs/assets/sync-placeholder.gif)
+
+### Template-Powered Source Notes
+
+Each Zotero item gets one auto-generated source note, rendered with [LiquidJS](https://liquidjs.com) templates you fully control. Notes regenerate when annotations change and are locked to prevent accidental edits — your own ideas go in separate notes that link back.
+
+<!-- TODO: replace with actual GIF -->
+
+![Source Notes](docs/assets/source-notes-placeholder.gif)
+
+### Multi-Format Citations
+
+Insert citations as **Pandoc** (`[@key]`), **Wikilinks** (`[[note]]`), **Footnotes**, or raw citekeys. Trigger them via command, autocomplete-as-you-type, or drag-and-drop from the tree view — with optional annotation context included.
+
+<!-- TODO: replace with actual GIF -->
+
+![Citations](docs/assets/citations-placeholder.gif)
 
 ### Zotero Tree View
 
-- Browse your entire Zotero library structure (collections, items, attachments) in a sidebar tree.
-- Quickly open attachments or source notes from the tree.
+Browse your entire Zotero library — collections, items, attachments — in a sidebar tree. Sort by title, date added, or date modified. Open any attachment or source note with a single click.
 
-### Activity Center
+<!-- TODO: replace with actual GIF -->
 
-- **Sync tab** — view library statuses, pending changes, conflicts, and trigger syncs.
-- **Tasks tab** — monitor running and completed background tasks (sync, batch note creation, image extraction).
-- **Telemetry tab** — searchable, filterable in-memory log console with expandable entries and copy support.
+![Tree View](docs/assets/tree-view-placeholder.gif)
 
-### Other
+### And More
 
-- **Protocol handler** — open notes or attachments via `obsidian://zotflow?type=open-note&libraryID=...&key=...` URIs.
-- **Secure credential storage** — API keys and passwords are stored in Obsidian's `SecretStorage`, never in synced `data.json`.
-- **Mobile-safe** — designed to work on both desktop and mobile.
-- **Offline-first** — all data is cached locally in IndexedDB. Network is only used for Zotero API and WebDAV.
+- **WebDAV Support** — download attachments from your self-hosted storage.
+- **Zotero LABD Support** — Support attachment which store in Zotero as a linked_file.
+- **Batch operations** — create all source notes, extract all annotation images, or re-render all templates in one go.
+- **Activity Center** — monitor sync progress, running tasks, and view a searchable log console.
+- **Offline-first** — all data cached in IndexedDB. Network is only used for Zotero API and WebDAV.
+- **Secure credentials** — API keys stored in Obsidian's `SecretStorage`, never in synced `data.json`.
+- **Mobile-safe** — works on both desktop and mobile (current mobile support is limited).
 
-<!-- ## Installation
+## Installation
 
-### From Community Plugins (recommended)
+> **Note:** This plugin is currently in beta and not available in the official Obsidian Community Plugins store yet.
 
-1. Open **Settings → Community plugins → Browse**.
-2. Search for **ZotFlow**.
-3. Click **Install**, then **Enable**.
+### From BRAT
 
-### Manual Installation
+1. **Install BRAT Plugin**
+    - Open Obsidian Settings (⚙️)
+    - Go to **Community plugins**
+    - Click **Browse** and search for "BRAT"
+    - Install and enable the **BRAT** plugin
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/duanxianpi/obsidian-zotflow/releases).
-2. Create a folder at `<your-vault>/.obsidian/plugins/obsidian-zotflow/`.
-3. Copy the three files into that folder.
-4. Reload Obsidian → **Settings → Community plugins** → enable **ZotFlow**. -->
+2. **Add Beta Plugin**
+    - In Obsidian, open **Settings → Community plugins**
+    - Find **BRAT** in your installed plugins and click **Options**
+    - Click **Add Beta plugin**
+    - Enter the repository: `duanxianpi/obsidian-zotflow`
+    - Click **Add Plugin**
+
+3. **Enable Plugin**
+    - Go to **Settings → Community plugins**
+    - Find **Obsidian ZotFlow** in the list
+    - Toggle it on to enable
+
+4. Open **Settings → Community plugins → Browse**.
+5. Search for **ZotFlow**.
+6. Click **Install**, then **Enable**.
 
 ## Quick Start
 
@@ -72,18 +110,13 @@ ZotFlow's source notes follow a **Zettelkasten-inspired** philosophy: each Zoter
 
 ## Documentation
 
-| Guide                                                      | Description                                                                                    |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **[Getting Started](docs/getting-started.md)**             | Install ZotFlow, connect your Zotero account, configure libraries, and run your first sync.    |
-| **[Reading & Annotating](docs/reading-and-annotating.md)** | Open PDFs/EPUBs in the built-in reader, annotate, and use the local reader for vault files.    |
-| **[Source Notes](docs/source-notes.md)**                   | Create, customize, and understand auto-generated source notes.                                 |
-| **[Template Guide](docs/template-guide.md)**               | Full LiquidJS template reference — all variables, filters, frontmatter handling, and examples. |
+Check out the [full documentation](docs/README.md) for detailed guides, troubleshooting, and advanced features.
 
-## Commands
+<!-- ## Commands
 
 TODO
 
-<!-- | Command                   | Description                              |
+| Command                   | Description                              |
 | ------------------------- | ---------------------------------------- |
 | **Open Zotero Tree View** | Show the library browser in the sidebar. | -->
 
