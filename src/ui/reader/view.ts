@@ -287,12 +287,19 @@ export class ZoteroReaderView extends ItemView {
                         savedViewState?.darkTheme ?? themeDefaults.darkTheme,
                 };
 
+                const libraryConfig =
+                    services.settings.librariesConfig[
+                        String(this.attachmentItem.libraryID)
+                    ];
+                const isReadOnly = libraryConfig?.mode === "readonly";
+
                 const opts: Partial<CreateReaderOptions> = {
                     annotations: annotationJson,
                     primaryViewState: savedViewState?.primaryViewState,
                     colorScheme: this.colorScheme,
                     customThemes: services.viewStateService.getCustomThemes(),
                     ...themeOverrides,
+                    ...(isReadOnly ? { readOnly: true } : {}),
                 };
 
                 const contentType = this.attachmentItem.raw.data.contentType;

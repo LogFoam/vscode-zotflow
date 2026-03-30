@@ -26,6 +26,7 @@ export interface CreateReaderOptions {
     sidebarWidth?: number;
     primaryViewState?: Record<string, unknown>;
     secondaryViewState?: Record<string, unknown>;
+    readOnly?: boolean;
 }
 
 /** Discriminated union of all events the reader iframe can emit to the parent. */
