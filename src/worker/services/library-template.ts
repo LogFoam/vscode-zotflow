@@ -543,7 +543,7 @@ export class LibraryTemplateService {
         return {
             key: item.key,
             libraryID: item.libraryID,
-            filename: data.filename || "",
+            filename: data.filename || data.title || "",
             contentType: data.contentType || "",
             tags: data.tags || [],
             dateAdded: item.dateAdded,

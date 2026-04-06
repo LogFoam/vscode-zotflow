@@ -127,6 +127,7 @@ export class NoteEditorView extends ItemView {
 
             this.editor = createEmbeddableMarkdownEditor(this.app, wrapper, {
                 value: editableContent,
+                readableLineLength: true,
                 onChange: () => this.scheduleSave(),
             });
         } catch (e) {

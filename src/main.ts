@@ -161,7 +161,7 @@ export default class ZotFlow extends Plugin {
                 } catch {
                     const message = `Could not register extension: '${extension}'`;
                     services.logService.error(message, "Main");
-                    services.notificationService.notify("error", message);
+                    // services.notificationService.notify("error", message);
                 }
             }
         }
