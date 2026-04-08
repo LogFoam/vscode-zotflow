@@ -115,4 +115,9 @@ export class IndexService {
         }
         return this.keyToFileMap.get(key);
     }
+
+    /** Return all indexed zotero-key → TFile entries (for vault-wide operations like repair). */
+    public getAllIndexedFiles(): ReadonlyMap<string, TFile> {
+        return this.keyToFileMap;
+    }
 }

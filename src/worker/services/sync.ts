@@ -826,8 +826,9 @@ export class SyncService {
                     );
 
                     if (item.syncStatus === "created") {
-                        delete itemRawData.key;
-                        delete itemRawData.data.key;
+                        // Keep client-provided key so the server adopts it
+                        itemRawData.key = item.key;
+                        itemRawData.data.key = item.key;
                         delete itemRawData.version;
                         delete itemRawData.data.version;
                     } else {
@@ -906,15 +907,22 @@ export class SyncService {
 
                             if (serverResponseItem.data) {
                                 newItem.raw = serverResponseItem;
-                                // If successful, update item with server response
-                                if (item.syncStatus === "created") {
+                                // For created items the server should echo
+                                // back our client-provided key. If it differs
+                                // (edge case), fall back to delete-old/insert-new.
+                                if (
+                                    item.syncStatus === "created" &&
+                                    serverResponseItem.key !== item.key
+                                ) {
                                     newItem.key = serverResponseItem.key;
                                     newItem.raw.key = serverResponseItem.key;
                                     idsToDelete.push(item.key);
                                 }
                             } else if (!serverResponseItem.isUnchanged) {
-                                // If unchanged, update item with unchanged data
-                                if (item.syncStatus === "created") {
+                                if (
+                                    item.syncStatus === "created" &&
+                                    serverResponseItem.key !== item.key
+                                ) {
                                     newItem.key = serverResponseItem.key;
                                     idsToDelete.push(item.key);
                                 }
