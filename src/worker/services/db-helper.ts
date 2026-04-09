@@ -344,4 +344,77 @@ export class DbHelperService {
             .equals([libraryID, parentKey, "attachment", 0])
             .toArray();
     }
+
+    /**
+     * Get lightweight annotation candidates for the repair view.
+     * Returns all annotations under a parent item (across all its attachments),
+     * keyed by annotation key.
+     *
+     * If `libraryID` is omitted, the item is looked up by key alone across all
+     * libraries (keys are unique in practice).
+     */
+    async getAnnotationCandidates(
+        libraryID: number | null,
+        parentKey: string,
+    ): Promise<
+        { key: string; pageLabel: string; text: string; type: string }[]
+    > {
+        // Resolve libraryID if not provided — try each filtered library
+        let resolvedLibraryID = libraryID;
+        if (resolvedLibraryID == null) {
+            const libraryIDs = await this.getFilteredLibraryIDs();
+            for (const lid of libraryIDs) {
+                const match = await db.items.get([lid, parentKey]);
+                if (match) {
+                    resolvedLibraryID = lid;
+                    break;
+                }
+            }
+            if (resolvedLibraryID == null) return [];
+        }
+
+        // Get child attachments
+        const attachments = await db.items
+            .where(["libraryID", "parentItem", "itemType", "trashed"])
+            .equals([resolvedLibraryID, parentKey, "attachment", 0])
+            .toArray();
+
+        // Also check if the item itself is a standalone attachment
+        const item = await db.items.get([resolvedLibraryID, parentKey]);
+        const attachmentKeys = attachments.map((a) => a.key);
+        if (item?.itemType === "attachment") {
+            attachmentKeys.push(parentKey);
+        }
+
+        // Get all annotations under these attachments
+        const results: {
+            key: string;
+            pageLabel: string;
+            text: string;
+            type: string;
+        }[] = [];
+
+        for (const attKey of attachmentKeys) {
+            const annotations = await db.items
+                .where(["libraryID", "parentItem", "itemType", "trashed"])
+                .equals([resolvedLibraryID, attKey, "annotation", 0])
+                .toArray();
+
+            for (const ann of annotations) {
+                const data = ann.raw?.data as unknown as Record<
+                    string,
+                    unknown
+                >;
+                if (!data) continue;
+                results.push({
+                    key: ann.key,
+                    pageLabel: (data.annotationPageLabel as string) ?? "",
+                    text: (data.annotationText as string) ?? "",
+                    type: (data.annotationType as string) ?? "",
+                });
+            }
+        }
+
+        return results;
+    }
 }

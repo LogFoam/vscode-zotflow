@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from "react";
 import { ObsidianIcon } from "../ObsidianIcon";
+import { workerBridge } from "bridge";
 import { services } from "services/services";
 
-import type { TFile, CachedMetadata } from "obsidian";
+import type { TFile } from "obsidian";
 
 /* ================================================================ */
 /*  Types                                                           */
@@ -64,65 +65,9 @@ function extractPageFromDisplay(display: string): string | null {
 }
 
 /**
- * Build a map of existing block IDs in a source note, enriched with annotation metadata
- * parsed from the callout structure.
- *
- * Expected structure per annotation block:
- * ```
- * > [!zotflow-TYPE-COLOR] [file, p.PAGE](...)
- * > > TEXT
- * ^BLOCKID
- * ```
- */
-function parseSourceNoteBlocks(
-    content: string,
-    cache: CachedMetadata | null,
-): Map<string, RepairCandidate> {
-    const result = new Map<string, RepairCandidate>();
-
-    // Use Obsidian's cached blocks if available
-    const blocks = cache?.blocks;
-    if (!blocks) return result;
-
-    const lines = content.split("\n");
-
-    for (const [blockId, blockInfo] of Object.entries(blocks)) {
-        const lineIdx = blockInfo.position.start.line;
-
-        // Walk backwards from the block ref line to find the callout header
-        let pageLabel = "";
-        let text = "";
-        let type = "";
-
-        for (let i = lineIdx - 1; i >= Math.max(0, lineIdx - 10); i--) {
-            const line = lines[i];
-            if (!line) continue;
-
-            // Match callout header: > [!zotflow-TYPE-COLOR] [file, p.PAGE](...)
-            const calloutMatch = line.match(
-                />\s*\[!zotflow-(\w+)-[^\]]*\]\s*\[[^,]*,\s*p\.([^\]]*)\]/,
-            );
-            if (calloutMatch) {
-                type = calloutMatch[1] ?? "";
-                pageLabel = calloutMatch[2]?.trim() ?? "";
-                break;
-            }
-
-            // Match annotation text line: > > TEXT
-            const textMatch = line.match(/^>\s*>\s*(.+)/);
-            if (textMatch && !text) {
-                text = textMatch[1]?.trim() ?? "";
-            }
-        }
-
-        result.set(blockId, { blockId, pageLabel, text, type });
-    }
-
-    return result;
-}
-
-/**
  * Scan the vault for broken block references targeting ZotFlow source notes.
+ * Uses the IndexedDB (via worker bridge) to get authoritative annotation data
+ * instead of parsing markdown.
  * Returns a list of RepairItems with candidate matches.
  */
 async function scanVault(): Promise<RepairItem[]> {
@@ -130,20 +75,53 @@ async function scanVault(): Promise<RepairItem[]> {
     const indexedFiles = services.indexService.getAllIndexedFiles();
     const results: RepairItem[] = [];
 
-    // Build lookup: normalized note path → { file, blockMap }
+    // Build lookup: normalized note path → { file, existingBlockIds, candidates }
+    // existingBlockIds: set of block IDs currently in the note (from Obsidian cache)
+    // candidates: annotation data from DB (authoritative)
     const sourceNoteInfo = new Map<
         string,
-        { file: TFile; blockMap: Map<string, RepairCandidate> }
+        {
+            file: TFile;
+            existingBlockIds: Set<string>;
+            candidates: RepairCandidate[];
+        }
     >();
 
     for (const [, file] of indexedFiles) {
         const cache = app.metadataCache.getFileCache(file);
-        const content = await app.vault.cachedRead(file);
-        const blockMap = parseSourceNoteBlocks(content, cache);
+        const libraryID = cache?.frontmatter?.["library-id"] as
+            | number
+            | undefined;
+        const zoteroKey = cache?.frontmatter?.["zotero-key"] as
+            | string
+            | undefined;
+
+        // Collect existing block IDs from the note's cache
+        const existingBlockIds = new Set<string>(
+            cache?.blocks ? Object.keys(cache.blocks) : [],
+        );
+
+        // Query DB for annotation candidates if we have the zotero key
+        let candidates: RepairCandidate[] = [];
+        if (zoteroKey) {
+            const dbAnnotations =
+                await workerBridge.dbHelper.getAnnotationCandidates(
+                    libraryID ?? null,
+                    zoteroKey,
+                );
+            candidates = dbAnnotations.map((a) => ({
+                blockId: a.key,
+                pageLabel: a.pageLabel,
+                text: a.text,
+                type: a.type,
+            }));
+        }
+
+        const info = { file, existingBlockIds, candidates };
         // Store both with and without .md extension for flexible matching
         const pathNoExt = file.path.replace(/\.md$/, "");
-        sourceNoteInfo.set(file.path, { file, blockMap });
-        sourceNoteInfo.set(pathNoExt, { file, blockMap });
+        sourceNoteInfo.set(file.path, info);
+        sourceNoteInfo.set(pathNoExt, info);
     }
 
     // Scan all markdown files for wikilinks with block refs
@@ -165,7 +143,8 @@ async function scanVault(): Promise<RepairItem[]> {
             if (!info) continue;
 
             // Check if the block ref exists in the target note
-            if (info.blockMap.has(blockId)) continue;
+            // Obsidian normalizes block IDs to lowercase in the cache
+            if (info.existingBlockIds.has(blockId.toLowerCase())) continue;
 
             // This is a broken reference — find candidates
             const lineIdx =
@@ -195,7 +174,7 @@ async function scanVault(): Promise<RepairItem[]> {
 
             // Try to match by page number from display text
             const page = extractPageFromDisplay(displayText);
-            const candidates = Array.from(info.blockMap.values());
+            const candidates = info.candidates;
 
             let selectedBlockId: string | null = null;
             let autoMatched = false;
